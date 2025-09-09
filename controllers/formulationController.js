@@ -1,34 +1,101 @@
-import Formulation from '../models/formulation.js';
+import Formulation from '../models/Formulation.js';
 import cloudinary from '../config/cloudinary.js';
 
 export async function createFormulation(req, res) {
   try {
-    const { nombre, email, descripcion, promedio, estado, carrera, claveEscuela } = req.body;
-    if (!nombre || !email || !descripcion || !promedio || !estado || !carrera || !claveEscuela) {
-      return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
+    const { 
+      nombre, 
+      apellidoPaterno, 
+      apellidoMaterno, 
+      curp, 
+      telefonoCasa, 
+      telefonoCelular, 
+      correoPersonal, 
+      correoInstitucional,
+      institucion, 
+      carrera, 
+      promedio, 
+      estado 
+    } = req.body;
+
+    // Validar campos obligatorios
+    if (!nombre || !apellidoPaterno || !apellidoMaterno || !curp || !telefonoCasa || !telefonoCelular || !correoPersonal || !institucion || !carrera || !promedio || !estado) {
+      return res.status(400).json({ error: 'Todos los campos obligatorios deben ser completados.' });
     }
-    if (!req.file) {
-      return res.status(400).json({ error: 'El PDF es obligatorio.' });
+
+    // Validar formato de CURP
+    if (curp.length !== 18) {
+      return res.status(400).json({ error: 'El CURP debe tener exactamente 18 caracteres.' });
     }
-    // Subir PDF a Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: 'raw',
-      folder: 'formulations_pdfs'
-    });
-    // Guardar solo la URL del PDF en la colección Formulation
+
+    // Validar que el promedio esté en rango válido
+    const promedioNum = parseFloat(promedio);
+    if (promedioNum < 0 || promedioNum > 10) {
+      return res.status(400).json({ error: 'El promedio debe estar entre 0 y 10.' });
+    }
+
+    let pdfUrl = null;
+
+    // Subir PDF a Cloudinary si existe
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: 'raw',
+          folder: 'formulations_pdfs',
+          public_id: `${curp}_${Date.now()}`,
+          use_filename: true
+        });
+        pdfUrl = result.secure_url;
+      } catch (uploadError) {
+        console.error('Error uploading PDF:', uploadError);
+        return res.status(500).json({ error: 'Error al subir el documento PDF.' });
+      }
+    }
+
+    // Crear nueva formulación
     const formulation = new Formulation({
-      nombre,
-      email,
-      descripcion,
-      promedio,
+      nombre: nombre.trim(),
+      apellidoPaterno: apellidoPaterno.trim(),
+      apellidoMaterno: apellidoMaterno.trim(),
+      curp: curp.toUpperCase().trim(),
+      telefonoCasa: telefonoCasa.trim(),
+      telefonoCelular: telefonoCelular.trim(),
+      correoPersonal: correoPersonal.toLowerCase().trim(),
+      correoInstitucional: correoInstitucional ? correoInstitucional.toLowerCase().trim() : undefined,
+      institucion: institucion.trim(),
+      carrera: carrera.trim(),
+      promedio: promedioNum,
       estado,
-      carrera,
-      claveEscuela,
-      pdfUrl: result.secure_url
+      pdfUrl
     });
+
     await formulation.save();
-    res.status(201).json({ message: 'Formulario guardado correctamente.', formulation });
+    
+    res.status(201).json({ 
+      message: 'Formulario guardado correctamente.', 
+      formulation: {
+        id: formulation._id,
+        nombre: formulation.nombre,
+        apellidoPaterno: formulation.apellidoPaterno,
+        apellidoMaterno: formulation.apellidoMaterno,
+        correoPersonal: formulation.correoPersonal,
+        institucion: formulation.institucion,
+        carrera: formulation.carrera,
+        fecha: formulation.fecha
+      }
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Error al guardar el formulario.' });
+    console.error('Error creating formulation:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ error: `Errores de validación: ${errors.join(', ')}` });
+    }
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Ya existe un registro con este correo o CURP.' });
+    }
+    
+    res.status(500).json({ error: 'Error interno del servidor al guardar el formulario.' });
   }
 }

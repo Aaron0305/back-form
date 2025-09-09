@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/embajada', {
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/embajada', {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       autoIndex: true // Habilitar la creación automática de índices
