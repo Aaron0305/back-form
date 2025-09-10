@@ -605,6 +605,64 @@ ${templateData.companyName}
   }
 
   /**
+   * Envía un email de confirmación de registro de formulario
+   * @param {string} email - Email del destinatario
+   * @param {object} data - Datos del formulario (nombre, apellidoPaterno, apellidoMaterno, institucion, carrera)
+   */
+  async sendFormSubmissionConfirmation(email, data) {
+    try {
+      this.ensureTransporter();
+
+      const templateData = {
+        userName: `${data.nombre} ${data.apellidoPaterno} ${data.apellidoMaterno}`,
+        institucion: data.institucion || '',
+        carrera: data.carrera || '',
+        fecha: new Date().toLocaleDateString('es-MX'),
+        supportEmail: process.env.SUPPORT_EMAIL || 'soporte@sistema.com',
+        companyName: process.env.COMPANY_NAME || 'Registro de Candidatos',
+        currentYear: new Date().getFullYear()
+      };
+
+      // Intentar usar template 'form-submitted' si existe, si no usar HTML inline
+      let htmlContent;
+      try {
+        htmlContent = this.compileTemplate('form-submitted', templateData);
+      } catch (e) {
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif;">
+            <h2>Registro recibido</h2>
+            <p>Hola ${templateData.userName},</p>
+            <p>Hemos recibido correctamente tu formulario de registro en ${templateData.companyName}.</p>
+            <p>Institución: <strong>${templateData.institucion}</strong></p>
+            <p>Carrera: <strong>${templateData.carrera}</strong></p>
+            <p>Fecha de registro: ${templateData.fecha}</p>
+            <p>Si necesitas ayuda, contacta a ${templateData.supportEmail}.</p>
+            <br/>
+            <p>Saludos,<br/>${templateData.companyName}</p>
+          </div>
+        `;
+      }
+
+      const mailOptions = {
+        from: {
+          name: process.env.EMAIL_FROM_NAME || 'Registro de Candidatos',
+          address: process.env.EMAIL_FROM || process.env.EMAIL_USER
+        },
+        to: email,
+        subject: 'Confirmación de registro de formulario',
+        html: htmlContent
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Email de confirmación de registro enviado a:', email, { messageId: result.messageId });
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error enviando email de confirmación de registro:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Verifica la conexión del servicio de email
    */
   async verifyConnection() {

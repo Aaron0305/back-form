@@ -1,5 +1,6 @@
 import Formulation from '../models/Formulation.js';
 import cloudinary from '../config/cloudinary.js';
+import emailService from '../services/emailService.js';
 
 export async function createFormulation(req, res) {
   try {
@@ -38,17 +39,24 @@ export async function createFormulation(req, res) {
 
     // Subir PDF a Cloudinary si existe
     if (req.file) {
-      try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: 'raw',
-          folder: 'formulations_pdfs',
-          public_id: `${curp}_${Date.now()}`,
-          use_filename: true
-        });
-        pdfUrl = result.secure_url;
-      } catch (uploadError) {
-        console.error('Error uploading PDF:', uploadError);
-        return res.status(500).json({ error: 'Error al subir el documento PDF.' });
+      // El middleware de subida ya debe haber subido el archivo a Cloudinary
+      // y colocado la URL en req.file.cloudinaryUrl
+      if (req.file.cloudinaryUrl) {
+        pdfUrl = req.file.cloudinaryUrl;
+      } else {
+        // En caso de que todavía venga como path (fallback), intentar subir
+        try {
+          const result = await cloudinary.uploader.upload(req.file.path, {
+            resource_type: 'raw',
+            folder: 'formulations_pdfs',
+            public_id: `${curp}_${Date.now()}`,
+            use_filename: true
+          });
+          pdfUrl = result.secure_url;
+        } catch (uploadError) {
+          console.error('Error uploading PDF fallback:', uploadError);
+          return res.status(500).json({ error: 'Error al subir el documento PDF.' });
+        }
       }
     }
 
@@ -70,7 +78,18 @@ export async function createFormulation(req, res) {
     });
 
     await formulation.save();
-    
+    // Enviar correo de confirmación de registro (no bloquear la respuesta si falla)
+    try {
+      await emailService.sendFormSubmissionConfirmation(formulation.correoPersonal, {
+        nombre: formulation.nombre,
+        apellidoPaterno: formulation.apellidoPaterno,
+        apellidoMaterno: formulation.apellidoMaterno,
+        institucion: formulation.institucion,
+        carrera: formulation.carrera
+      });
+    } catch (emailError) {
+      console.error('Error enviando correo de confirmación:', emailError);
+    }
     res.status(201).json({ 
       message: 'Formulario guardado correctamente.', 
       formulation: {
