@@ -118,3 +118,14 @@ export async function createFormulation(req, res) {
     res.status(500).json({ error: 'Error interno del servidor al guardar el formulario.' });
   }
 }
+
+export async function getAllFormulations(req, res) {
+  try {
+    // Obtener todos los registros y ordenarlos por fecha de creación descendente
+    const formulations = await Formulation.find({}).sort({ fecha: -1 });
+    res.status(200).json(formulations);
+  } catch (error) {
+    console.error('Error al obtener los registros de formulación:', error);
+    res.status(500).json({ error: 'Error interno del servidor al obtener los registros.' });
+  }
+}
