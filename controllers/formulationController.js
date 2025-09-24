@@ -16,11 +16,12 @@ export async function createFormulation(req, res) {
       institucion, 
       carrera, 
       promedio, 
-      estado 
+      estado,
+      grupo
     } = req.body;
 
     // Validar campos obligatorios
-    if (!nombre || !apellidoPaterno || !apellidoMaterno || !curp || !telefonoCasa || !telefonoCelular || !correoPersonal || !institucion || !carrera || !promedio || !estado) {
+    if (!nombre || !apellidoPaterno || !apellidoMaterno || !curp || !telefonoCasa || !telefonoCelular || !correoPersonal || !institucion || !carrera || !promedio || !estado || !grupo) {
       return res.status(400).json({ error: 'Todos los campos obligatorios deben ser completados.' });
     }
 
@@ -80,6 +81,7 @@ export async function createFormulation(req, res) {
       carrera: carrera.trim(),
       promedio: promedioNum,
       estado,
+      grupo: grupo.trim(),
       pdfUrl
     });
 
@@ -106,6 +108,7 @@ export async function createFormulation(req, res) {
         correoPersonal: formulation.correoPersonal,
         institucion: formulation.institucion,
         carrera: formulation.carrera,
+        grupo: formulation.grupo,
         fecha: formulation.fecha
       }
     });

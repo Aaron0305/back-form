@@ -70,6 +70,12 @@ const FormulationSchema = new mongoose.Schema({
 		enum: ['regular', 'irregular'],
 		required: true
 	},
+	// Grupo seleccionado (ej. 'Grupo 1: ...')
+	grupo: {
+		type: String,
+		required: true,
+		trim: true
+	},
 	// Archivo PDF
 	pdfUrl: {
 		type: String,
