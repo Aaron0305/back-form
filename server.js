@@ -16,6 +16,7 @@ import formulationRoutes from './routes/formulationRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 import notificationService from './services/notificationService.js';
 import { startScheduledAssignmentsCron } from './services/scheduledAssignmentsService.js';
+import Formulation from './models/Formulation.js';
 
 dotenv.config();
 
@@ -96,7 +97,29 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3001;
 
 // Conectar a la base de datos
-connectDB().then(() => {
+connectDB().then(async () => {
+    // Sincronizar índices del modelo para asegurar índice único en CURP
+    try {
+        await Formulation.syncIndexes();
+        console.log('✅ Índices de Formulation sincronizados');
+    } catch (err) {
+        console.error('⚠️ Error al sincronizar índices de Formulation:', err.message);
+    }
+
+    // Asegurar índice único en CURP en la colección (idempotente)
+    try {
+        const indexes = await Formulation.collection.indexes();
+        const curpIndex = indexes.find(ix => JSON.stringify(ix.key) === JSON.stringify({ curp: 1 }));
+        if (curpIndex && !curpIndex.unique) {
+            await Formulation.collection.dropIndex(curpIndex.name);
+            console.log('🔧 Índice curp existente eliminado para recrear como único');
+        }
+        await Formulation.collection.createIndex({ curp: 1 }, { unique: true, name: 'curp_1' });
+        console.log('✅ Índice único en CURP asegurado');
+    } catch (err) {
+        console.error('⚠️ No se pudo asegurar índice único en CURP:', err.message);
+    }
+
     httpServer.listen(PORT, () => {
         console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
         console.log('✅ Configurado para usar Cloudinary en lugar de almacenamiento local');

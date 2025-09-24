@@ -60,6 +60,7 @@ const uploadToCloudinary = (buffer, folder, fileInfo) => {
                 // Agregar las URLs al resultado
                 result.viewUrl = urls.viewUrl;
                 result.downloadUrl = urls.downloadUrl;
+                result.displayName = urls.displayName;
                 resolve(result);
             }
         );
@@ -117,6 +118,7 @@ const uploadToCloud = async (req, res, next) => {
             const fileType = req.file.originalname.split('.').pop().toLowerCase();
             
             req.file.cloudinaryUrl = result.viewUrl; // URL para visualización
+            req.file.cloudinaryDownloadUrl = result.downloadUrl; // URL directa de descarga con nombre
             req.file.cloudinaryId = result.public_id;
             req.file.displayName = result.displayName; // Nombre para mostrar
             req.file.mimeType = req.file.mimetype;
@@ -131,6 +133,7 @@ const uploadToCloud = async (req, res, next) => {
                 
                 // Asignar URLs y metadatos
                 file.cloudinaryUrl = result.viewUrl; // URL para visualización
+                file.cloudinaryDownloadUrl = result.downloadUrl; // URL directa de descarga con nombre
                 file.cloudinaryId = result.public_id;
                 file.displayName = result.displayName; // Nombre para mostrar
                 file.mimeType = file.mimetype;

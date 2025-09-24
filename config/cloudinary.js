@@ -44,16 +44,6 @@ const configureCloudinary = async () => {
             { resource_type: 'raw' }
         );
 
-        // Configurar transformaciones predeterminadas para PDFs
-        cloudinary.config({
-            secure: true,
-            transformation: {
-                flags: "attachment",
-                format: "pdf",
-                quality: "auto"
-            }
-        });
-
         console.log('✅ Configuración de Cloudinary completada');
     } catch (error) {
         console.error('⚠️ Aviso de configuración de Cloudinary:', error.message);
@@ -62,28 +52,45 @@ const configureCloudinary = async () => {
 
 // Función para generar URLs optimizadas
 const generateCloudinaryUrls = (result, fileInfo) => {
-    let baseUrl = result.secure_url;
-    
-    // Para PDFs y otros documentos
-    if (fileInfo.mimetype === 'application/pdf') {
-        // URL específica para PDFs con parámetros de visualización
-        baseUrl = baseUrl.replace('/upload/', '/upload/fl_attachment:false/');
-        const viewUrl = `${baseUrl}#view=FitH&toolbar=0&navpanes=0`;
+    const originalName = fileInfo.originalname || result.original_filename || 'document.pdf';
+    const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    let secureUrl = (result.secure_url || '').replace('http://', 'https://');
+
+    // Normalizar URLs incorrectas previas
+    secureUrl = secureUrl
+      .replace('/upload/fl_attachment:false/', '/upload/')
+      .replace('/raw/upload/fl_attachment:false/', '/raw/upload/');
+
+    // Para PDFs y otros documentos no imagen, usar resource_type raw para visualización
+    if (fileInfo.mimetype === 'application/pdf' || !fileInfo.mimetype.startsWith('image/')) {
+        // Asegurar /raw/upload/ para documentos
+        secureUrl = secureUrl.replace('/image/upload/', '/raw/upload/');
+
+        const viewUrl = secureUrl;
+        const downloadUrl = secureUrl.replace(
+            '/raw/upload/',
+            `/raw/upload/fl_attachment:${encodeURIComponent(safeName)}/`
+        );
+
         return {
-            viewUrl: viewUrl.replace('http://', 'https://'),
-            displayName: fileInfo.originalname
+            viewUrl,
+            downloadUrl,
+            displayName: originalName
         };
-    } else if (!fileInfo.mimetype.startsWith('image/')) {
-        // Otros documentos que no son imágenes
-        baseUrl = baseUrl.replace('/image/upload/', '/raw/upload/');
     }
 
-    // URL para visualización en línea (sin descarga)
-    const viewUrl = baseUrl.replace('/upload/', '/upload/fl_attachment:false/');
-    
+    // Para imágenes: mantener visualización normal y generar URL de descarga con nombre
+    const viewUrl = secureUrl.replace('/upload/fl_attachment:false/', '/upload/');
+    const downloadUrl = viewUrl.replace(
+        '/image/upload/',
+        `/image/upload/fl_attachment:${encodeURIComponent(safeName)}/`
+    );
+
     return {
-        viewUrl: viewUrl.replace('http://', 'https://'),
-        displayName: fileInfo.originalname
+        viewUrl,
+        downloadUrl,
+        displayName: originalName
     };
 };
 

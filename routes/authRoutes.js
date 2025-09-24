@@ -101,7 +101,7 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email }).populate('carrera', 'nombre');
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -163,10 +163,9 @@ router.get('/verify', async (req, res) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_secreto_muy_seguro_123');
     const user = await User.findById(decoded.id)
-      .select('-password')
-      .populate('carrera', 'nombre');
+      .select('-password');
 
     if (!user) {
       return res.status(404).json({
@@ -210,7 +209,7 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email }).populate('carrera', 'nombre');
+    const user = await User.findOne({ email });
 
     if (!user) {
       // Por seguridad, no revelamos si el email existe o no
@@ -223,7 +222,7 @@ router.post('/forgot-password', async (req, res) => {
     // Generar token de recuperación (válido por 1 hora)
     const resetToken = jwt.sign(
       { id: user._id, type: 'password-reset' },
-      process.env.JWT_SECRET || 'tu_jwt_secret',
+      process.env.JWT_SECRET || 'tu_secreto_muy_seguro_123',
       { expiresIn: '1h' }
     );
 
@@ -293,7 +292,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Verificar el token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_secreto_muy_seguro_123');
     
     if (decoded.type !== 'password-reset') {
       return res.status(400).json({
@@ -302,7 +301,7 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    const user = await User.findById(decoded.id).populate('carrera', 'nombre');
+    const user = await User.findById(decoded.id);
 
     if (!user) {
       return res.status(404).json({

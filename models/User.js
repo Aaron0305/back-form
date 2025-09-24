@@ -7,35 +7,6 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
-  numeroControl: {
-    type: String,
-    required: [true, 'El número de control es requerido'],
-    trim: true
-  },
-  nombre: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  apellidoPaterno: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  apellidoMaterno: {
-    type: String,
-    trim: true
-  },
-  carrera: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Carrera',
-    required: true
-  },
-  semestre: {
-    type: Number,
-    required: false,
-    default: 1
-  },
   password: {
     type: String,
     required: true
@@ -44,14 +15,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  fotoPerfil: {
-    type: String,
-    default: null
-  },
   role: {
     type: String,
     enum: ['admin', 'docente'],
-    default: 'docente'
+    default: 'admin'
   },
   resetPasswordToken: {
     type: String,

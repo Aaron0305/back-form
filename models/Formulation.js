@@ -88,7 +88,7 @@ const FormulationSchema = new mongoose.Schema({
 
 // Índices para mejorar las consultas
 FormulationSchema.index({ correoPersonal: 1 });
-FormulationSchema.index({ curp: 1 });
+FormulationSchema.index({ curp: 1 }, { unique: true });
 FormulationSchema.index({ fecha: -1 });
 
 // Middleware para validar CURP antes de guardar

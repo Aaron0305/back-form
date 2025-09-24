@@ -35,6 +35,12 @@ export async function createFormulation(req, res) {
       return res.status(400).json({ error: 'El promedio debe estar entre 0 y 10.' });
     }
 
+    // Validación previa de CURP duplicada (case-insensitive)
+    const existingByCurp = await Formulation.findOne({ curp: curp.toUpperCase().trim() });
+    if (existingByCurp) {
+      return res.status(400).json({ error: 'Ya existe un registro con esta CURP.' });
+    }
+
     let pdfUrl = null;
 
     // Subir PDF a Cloudinary si existe
@@ -112,7 +118,10 @@ export async function createFormulation(req, res) {
     }
     
     if (error.code === 11000) {
-      return res.status(400).json({ error: 'Ya existe un registro con este correo o CURP.' });
+      // Detectar campo que causó duplicado
+      const dupField = Object.keys(error.keyPattern || {})[0] || 'campo duplicado';
+      const message = dupField === 'curp' ? 'Ya existe un registro con esta CURP.' : 'Ya existe un registro con este correo o CURP.';
+      return res.status(400).json({ error: message });
     }
     
     res.status(500).json({ error: 'Error interno del servidor al guardar el formulario.' });
