@@ -225,7 +225,7 @@ class EmailService {
   async sendPasswordResetEmail(email, resetToken, user) {
     try {
       this.ensureTransporter(); // Asegurar que el transportador esté inicializado
-      const resetUrl = `https://frontend-opal-omega-97.vercel.app/reset-password?token=${resetToken}`;
+      const resetUrl = `camaradecomercio.vercel.app/reset-password?token=${resetToken}`;
       
       const templateData = {
         userName: `${user.nombre} ${user.apellidoPaterno}`,
