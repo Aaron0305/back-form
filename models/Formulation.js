@@ -90,6 +90,12 @@ const FormulationSchema = new mongoose.Schema({
 		type: Boolean,
 		default: true
 	}
+,
+	// Requisitos cumplidos (checkboxes) -> array de identificadores/string
+	fulfilled: {
+		type: [String],
+		default: []
+	}
 });
 
 // Índices para mejorar las consultas

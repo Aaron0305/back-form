@@ -140,6 +140,14 @@ connectDB().then(async () => {
             }
         };
 
+        // Permitir el nuevo campo `fulfilled` como array de strings
+        validator.$jsonSchema.properties.fulfilled = {
+            bsonType: 'array',
+            items: {
+                bsonType: 'string'
+            }
+        };
+
         // Ejecutar collMod (idempotente)
         const result = await db.command({
             collMod: collName,

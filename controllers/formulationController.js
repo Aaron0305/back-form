@@ -20,6 +20,22 @@ export async function createFormulation(req, res) {
       grupo
     } = req.body;
 
+    // Procesar campo `fulfilled` si viene como JSON string o array
+    let fulfilledArr = [];
+    if (req.body.fulfilled) {
+      if (Array.isArray(req.body.fulfilled)) {
+        fulfilledArr = req.body.fulfilled;
+      } else {
+        try {
+          fulfilledArr = JSON.parse(req.body.fulfilled);
+          if (!Array.isArray(fulfilledArr)) fulfilledArr = [];
+        } catch (e) {
+          // si no es JSON, intentar separar por comas
+          fulfilledArr = String(req.body.fulfilled).split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
+    }
+
     // Validar campos obligatorios
     if (!nombre || !apellidoPaterno || !apellidoMaterno || !curp || !telefonoCasa || !telefonoCelular || !correoPersonal || !institucion || !carrera || !promedio || !estado || !grupo) {
       return res.status(400).json({ error: 'Todos los campos obligatorios deben ser completados.' });
@@ -82,10 +98,12 @@ export async function createFormulation(req, res) {
       promedio: promedioNum,
       estado,
       grupo: grupo.trim(),
+      fulfilled: fulfilledArr,
       pdfUrl
     });
 
     await formulation.save();
+  console.log('✅ Formulation saved:', { id: formulation._id.toString(), curp: formulation.curp });
     // Enviar correo de confirmación de registro (no bloquear la respuesta si falla)
     try {
       await emailService.sendFormSubmissionConfirmation(formulation.correoPersonal, {
