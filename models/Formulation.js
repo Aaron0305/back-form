@@ -65,11 +65,11 @@ const FormulationSchema = new mongoose.Schema({
 		min: 0,
 		max: 10
 	},
-	estado: {
+		estado: {
 		type: String,
-		enum: ['regular', 'irregular'],
+		enum: ['regular', 'irregular', 'egresado', 'titulado', 'no-titulado'],
 		required: true
-	},
+		},
 	// Grupo seleccionado (ej. 'Grupo 1: ...')
 	grupo: {
 		type: String,

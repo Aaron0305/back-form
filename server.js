@@ -120,6 +120,36 @@ connectDB().then(async () => {
         console.error('⚠️ No se pudo asegurar índice único en CURP:', err.message);
     }
 
+    // Actualizar validador de la colección formulations para aceptar nuevos valores de 'estado'
+    try {
+        const db = Formulation.db.db; // obtener la instancia nativa de la db
+        const collName = Formulation.collection.collectionName;
+        console.log(`🔧 Actualizando validador de colección ${collName} si es necesario...`);
+
+        const validator = {
+            $jsonSchema: {
+                bsonType: 'object',
+                required: ['estado'],
+                properties: {
+                    estado: {
+                        enum: ['regular', 'irregular', 'egresado', 'titulado', 'no-titulado']
+                    }
+                }
+            }
+        };
+
+        // Ejecutar collMod (idempotente)
+        const result = await db.command({
+            collMod: collName,
+            validator,
+            validationLevel: 'moderate'
+        });
+
+        console.log('✅ Validador de colección actualizado:', result);
+    } catch (err) {
+        console.error('⚠️ No se pudo actualizar el validador de la colección:', err.message);
+    }
+
     httpServer.listen(PORT, () => {
         console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
         console.log('✅ Configurado para usar Cloudinary en lugar de almacenamiento local');
