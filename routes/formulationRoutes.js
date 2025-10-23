@@ -1,8 +1,10 @@
-import express from 'express';
-import { createFormulation, getAllFormulations } from '../controllers/formulationController.js';
-import { upload, uploadToCloud, handleMulterError } from '../middleware/uploadMiddleware.js';
 
+import express from 'express';
 const router = express.Router();
+import { createFormulation, getAllFormulations, importFormulationsFromCsv } from '../controllers/formulationController.js';
+import { upload, uploadToCloud, handleMulterError } from '../middleware/uploadMiddleware.js';
+// Importación masiva desde CSV (JSON)
+router.post('/import-csv', importFormulationsFromCsv);
 
 // Ruta para obtener todos los registros de formulación para el panel de admin
 router.get('/', getAllFormulations);

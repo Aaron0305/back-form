@@ -1,153 +1,113 @@
-import Formulation from '../models/Formulation.js';
-import cloudinary from '../config/cloudinary.js';
-import emailService from '../services/emailService.js';
-
-export async function createFormulation(req, res) {
+// Importación masiva desde CSV (JSON)
+export async function importFormulationsFromCsv(req, res) {
   try {
-    const { 
-      nombre, 
-      apellidoPaterno, 
-      apellidoMaterno, 
-      curp, 
-      telefonoCasa, 
-      telefonoCelular, 
-      correoPersonal, 
-      correoInstitucional,
-      institucion, 
-      carrera, 
-      promedio, 
-      estado,
-      grupo
-    } = req.body;
-
-    // Procesar campo `fulfilled` si viene como JSON string o array
-    let fulfilledArr = [];
-    if (req.body.fulfilled) {
-      if (Array.isArray(req.body.fulfilled)) {
-        fulfilledArr = req.body.fulfilled;
-      } else {
-        try {
-          fulfilledArr = JSON.parse(req.body.fulfilled);
-          if (!Array.isArray(fulfilledArr)) fulfilledArr = [];
-        } catch (e) {
-          // si no es JSON, intentar separar por comas
-          fulfilledArr = String(req.body.fulfilled).split(',').map(s => s.trim()).filter(Boolean);
+    const { registros } = req.body;
+    if (!Array.isArray(registros) || registros.length === 0) {
+      return res.status(400).json({ error: 'No se recibieron registros para importar.' });
+    }
+    // Importación flexible: solo se requiere 'curp', el resto de campos se insertan si existen
+    const docs = [];
+    const errores = [];
+      // Normaliza encabezados: quita acentos, espacios, guiones, mayúsculas, etc.
+      const normalize = s => String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // quita acentos
+        .replace(/[^a-z0-9]/g, ''); // deja solo letras y números
+    // Mapeo de posibles nombres de campos a los nombres internos
+      // Mapeo de variantes para cada campo
+      const camposMap = {
+    nombre: ['nombre', 'nombrealumno', 'nombre-alumno', 'nombre alumno', 'nombres'],
+    apellidoPaterno: ['apellidopaterno', 'apellido-paterno', 'apellido paterno', 'apellidop', 'apellidopaternoalumno'],
+    apellidoMaterno: ['apellidomaterno', 'apellido-materno', 'apellido materno', 'apellidom', 'apellidomaternoalumno'],
+    curp: ['curp', 'curp-alumno', 'curp alumno', 'curp_alumno'],
+    telefonoCasa: ['telefonocasa', 'telefono-casa', 'telefono casa', 'telcasa', 'telcasaalumno'],
+    telefonoCelular: ['telefonocelular', 'telefono-celular', 'telefono celular', 'telcel', 'telcelalumno'],
+    correoPersonal: ['correopersonal', 'correo-personal', 'correo personal', 'email', 'emailpersonal', 'correo'],
+    correoInstitucional: ['correoinstitucional', 'correo-institucional', 'correo institucional', 'emailinstitucional'],
+    institucion: ['institucion', 'institución', 'institucion-alumno', 'institucion alumno'],
+    carrera: ['carrera', 'carrera-alumno', 'carrera alumno'],
+    promedio: ['promedio', 'promedio-alumno', 'promedio alumno'],
+    estado: ['estado', 'estatus', 'estatusalumno', 'estadoalumno'],
+    grupo: ['grupo', 'grupo-alumno', 'grupo alumno'],
+    pdfUrl: ['pdfurl', 'pdf-url', 'pdf url'],
+  fulfilled: ['fulfilled', 'cumplidos', 'requisitoscumplidos']
+      };
+    for (const [i, row] of registros.entries()) {
+      const obj = {};
+      // Mapear solo los campos presentes en el CSV
+      for (const key in camposMap) {
+        const posibles = camposMap[key];
+        for (const encabezado in row) {
+          if (posibles.includes(normalize(encabezado))) {
+            obj[key] = row[encabezado];
+            break;
+          }
         }
       }
-    }
-
-    // Validar campos obligatorios
-    if (!nombre || !apellidoPaterno || !apellidoMaterno || !curp || !telefonoCasa || !telefonoCelular || !correoPersonal || !institucion || !carrera || !promedio || !estado || !grupo) {
-      return res.status(400).json({ error: 'Todos los campos obligatorios deben ser completados.' });
-    }
-
-    // Validar formato de CURP
-    if (curp.length !== 18) {
-      return res.status(400).json({ error: 'El CURP debe tener exactamente 18 caracteres.' });
-    }
-
-    // Validar que el promedio esté en rango válido
-    const promedioNum = parseFloat(promedio);
-    if (promedioNum < 0 || promedioNum > 10) {
-      return res.status(400).json({ error: 'El promedio debe estar entre 0 y 10.' });
-    }
-
-    // Validación previa de CURP duplicada (case-insensitive)
-    const existingByCurp = await Formulation.findOne({ curp: curp.toUpperCase().trim() });
-    if (existingByCurp) {
-      return res.status(400).json({ error: 'Ya existe un registro con esta CURP.' });
-    }
-
-    let pdfUrl = null;
-
-    // Subir PDF a Cloudinary si existe
-    if (req.file) {
-      // El middleware de subida ya debe haber subido el archivo a Cloudinary
-      // y colocado la URL en req.file.cloudinaryUrl
-      if (req.file.cloudinaryUrl) {
-        pdfUrl = req.file.cloudinaryUrl;
-      } else {
-        // En caso de que todavía venga como path (fallback), intentar subir
-        try {
-          const result = await cloudinary.uploader.upload(req.file.path, {
-            resource_type: 'raw',
-            folder: 'formulations_pdfs',
-            public_id: `${curp}_${Date.now()}`,
-            use_filename: true
-          });
-          pdfUrl = result.secure_url;
-        } catch (uploadError) {
-          console.error('Error uploading PDF fallback:', uploadError);
-          return res.status(500).json({ error: 'Error al subir el documento PDF.' });
+      // Solo se requiere curp para importar
+      if (!obj.curp) {
+        errores.push({ fila: i + 1, error: 'Falta el campo CURP.' });
+        continue;
+      }
+      // Validar formato de CURP si existe
+      if (obj.curp && String(obj.curp).length !== 18) {
+        errores.push({ fila: i + 1, error: 'CURP debe tener 18 caracteres.' });
+        continue;
+      }
+      // Si promedio existe, validar rango
+      let promedioNum = undefined;
+      if (obj.promedio !== undefined && obj.promedio !== null && obj.promedio !== '') {
+        promedioNum = parseFloat(obj.promedio);
+        if (isNaN(promedioNum) || promedioNum < 0 || promedioNum > 10) {
+          errores.push({ fila: i + 1, error: 'Promedio fuera de rango.' });
+          continue;
         }
       }
-    }
-
-    // Crear nueva formulación
-    const formulation = new Formulation({
-      nombre: nombre.trim(),
-      apellidoPaterno: apellidoPaterno.trim(),
-      apellidoMaterno: apellidoMaterno.trim(),
-      curp: curp.toUpperCase().trim(),
-      telefonoCasa: telefonoCasa.trim(),
-      telefonoCelular: telefonoCelular.trim(),
-      correoPersonal: correoPersonal.toLowerCase().trim(),
-      correoInstitucional: correoInstitucional ? correoInstitucional.toLowerCase().trim() : undefined,
-      institucion: institucion.trim(),
-      carrera: carrera.trim(),
-      promedio: promedioNum,
-      estado,
-      grupo: grupo.trim(),
-      fulfilled: fulfilledArr,
-      pdfUrl
-    });
-
-    await formulation.save();
-  console.log('✅ Formulation saved:', { id: formulation._id.toString(), curp: formulation.curp });
-    // Enviar correo de confirmación de registro (no bloquear la respuesta si falla)
-    try {
-      await emailService.sendFormSubmissionConfirmation(formulation.correoPersonal, {
-        nombre: formulation.nombre,
-        apellidoPaterno: formulation.apellidoPaterno,
-        apellidoMaterno: formulation.apellidoMaterno,
-        institucion: formulation.institucion,
-        carrera: formulation.carrera
-      });
-    } catch (emailError) {
-      console.error('Error enviando correo de confirmación:', emailError);
-    }
-    res.status(201).json({ 
-      message: 'Formulario guardado correctamente.', 
-      formulation: {
-        id: formulation._id,
-        nombre: formulation.nombre,
-        apellidoPaterno: formulation.apellidoPaterno,
-        apellidoMaterno: formulation.apellidoMaterno,
-        correoPersonal: formulation.correoPersonal,
-        institucion: formulation.institucion,
-        carrera: formulation.carrera,
-        grupo: formulation.grupo,
-        fecha: formulation.fecha
+      // Si correoPersonal existe, validar formato
+      if (obj.correoPersonal && !/^\S+@\S+\.\S+$/.test(obj.correoPersonal)) {
+        errores.push({ fila: i + 1, error: 'Correo personal inválido.' });
+        continue;
       }
-    });
-  } catch (error) {
-    console.error('Error creating formulation:', error);
-    
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ error: `Errores de validación: ${errors.join(', ')}` });
+      // Preparar documento solo con los campos presentes
+      const doc = { curp: String(obj.curp).toUpperCase().trim() };
+      for (const key in obj) {
+        if (key === 'curp') continue;
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+          if (key === 'promedio') {
+            doc[key] = promedioNum;
+          } else if (key === 'correoPersonal') {
+            doc[key] = obj[key].toLowerCase().trim();
+          } else if (key === 'estado') {
+            doc[key] = String(obj[key]).toLowerCase();
+          } else if (key === 'fulfilled') {
+            doc[key] = Array.isArray(obj[key]) ? obj[key] : [];
+          } else {
+            doc[key] = String(obj[key]).trim();
+          }
+        }
+      }
+      docs.push(doc);
     }
-    
-    if (error.code === 11000) {
-      // Detectar campo que causó duplicado
-      const dupField = Object.keys(error.keyPattern || {})[0] || 'campo duplicado';
-      const message = dupField === 'curp' ? 'Ya existe un registro con esta CURP.' : 'Ya existe un registro con este correo o CURP.';
-      return res.status(400).json({ error: message });
+    // Insertar en lote, omitir duplicados por curp
+    const bulkOps = docs.map(doc => ({
+      updateOne: {
+        filter: { curp: doc.curp },
+        update: { $setOnInsert: doc },
+        upsert: true
+      }
+    }));
+    if (bulkOps.length > 0) {
+      const result = await (await import('../models/Formulation.js')).default.bulkWrite(bulkOps, { ordered: false });
+      res.status(200).json({ message: 'Importación completada.', errores });
+    } else {
+      res.status(400).json({ error: 'No se insertó ningún registro.', errores });
     }
-    
-    res.status(500).json({ error: 'Error interno del servidor al guardar el formulario.' });
+    } catch (error) {
+      console.error('Error en importación masiva:', error);
+      res.status(500).json({ error: 'Error interno al importar registros.' });
+    }
   }
-}
 
 export async function getAllFormulations(req, res) {
   try {
