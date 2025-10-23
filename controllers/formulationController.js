@@ -1,3 +1,4 @@
+import Formulation from '../models/Formulation.js';
 // Importación masiva desde CSV (JSON)
 export async function importFormulationsFromCsv(req, res) {
   try {
